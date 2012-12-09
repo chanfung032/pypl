@@ -1,14 +1,7 @@
 # -*-coding: utf8 -*- 
 
 """A compiler for PL/0 language
-
-The source is compiled into python bytecode directly, so it can run on a python 
-vm directly. JIT? :)
 """
-
-def compile(source, filename, mode):
-    """Compile PL/0 source into PyCodeObject"""
-    print source
 
 from pyparsing import *
 
@@ -78,7 +71,6 @@ def do_mop(s, loc, toks):
     return [ast.Mult(**_i(loc, s)) if toks[0] == '*' else ast.Div(**_i(loc, s))]
 
 def do_lop(s, loc, toks):
-    print toks
     _mapping = { 
         '=': ast.Eq, '<>': ast.NotEq, '<': ast.Lt, '<=': ast.LtE,
         '>': ast.Gt, '>=': ast.GtE
@@ -123,16 +115,17 @@ def do_condition(s, loc, toks):
         return ast.Compare(toks[0], [toks[1]], [toks[2]], **_i(loc, s))
 
 def do_statement(s, loc, toks):
+    def _wrap(t):
+        return t if isinstance(t, list) else [t]
+
     if isinstance(toks[0], ast.Name):
         toks[0].ctx = ast.Store()
         return [ast.Assign([toks[0],], toks[1], **_i(loc, s))]
     elif toks[0] == 'if':
-        print 'if>>>>>', toks
-        return [ast.If(toks[1], [toks[3]], \
-                [toks[5]] if len(toks) == 6 else [], **_i(loc, s))]
+        return [ast.If(toks[1], _wrap(toks[3]), \
+                _wrap(toks[5]) if len(toks) == 6 else [], **_i(loc, s))]
     elif toks[0] == 'while':
-        print 'wile >>>>', toks
-        return [ast.While(toks[1], toks[3], [], **_i(loc, s))]
+        return [ast.While(toks[1], _wrap(toks[3]), [], **_i(loc, s))]
     elif toks[0] == 'call':
         toks[1].ctx = ast.Load()
         return [ast.Call(toks[1], toks[2:], [], [], [], **_i(loc, s))]
@@ -167,11 +160,14 @@ for k in locals().keys():
         expr.setParseAction(action)
         #expr.setDebug()
     
+def compile(source, filename, mode):
+    """Compile PL/0 source into PyCodeObject"""
+    print source
 
 if __name__ == '__main__':
     t1 = """
         program main;
-        var i,j,max,num;
+        var i, j, max, num;
         begin
             i := 0; max := 1000;
             num := 0;
@@ -189,8 +185,7 @@ if __name__ == '__main__':
                     num := num +1
                 end;
                 i := i+1
-            end;
-            write( num )
+            end
         end.
     """
 
