@@ -102,10 +102,11 @@ def do_term(s, loc, toks):
 def do_expression(s, loc, toks):
     if isinstance(toks[0], ast.USub) or isinstance(toks[0], ast.UAdd):
         left = ast.UnaryOp(toks[0], toks[1], **_i(loc, s))
-        toks.pop(0)
+        start = 2
     else:
         left = toks[0]
-    for i in range(1, len(toks), 2):
+        start = 1
+    for i in range(start, len(toks), 2):
         left = ast.BinOp(left, toks[i], toks[i+1], **_i(loc, s))
     return [left]
 
@@ -128,7 +129,8 @@ def do_statement(s, loc, toks):
         return [ast.While(toks[1], _list(toks[3]), [], **_i(loc, s))]
     elif toks[0] == 'call':
         toks[1].ctx = ast.Load()
-        return [ast.Call(toks[1], toks[2:], [], [], [], **_i(loc, s))]
+        call = ast.Call(toks[1], toks[2:], [], None, None, **_i(loc, s))
+        return [ast.Expr(call, **_i(loc, s))]
     elif toks[0] == 'read':
         pass
     elif toks[0] == 'write':
@@ -143,7 +145,11 @@ def do_body(s, loc, toks):
     return [toks[1:-1],]   # ignore keyword `begin` and `end`
 
 def do_procedure(s, loc, toks):
-    pass
+    for t in toks[2]:
+        t.ctx = ast.Param()
+    args = ast.arguments(args=list(toks[2]), vararg=None, kwarg=None,
+                         defaults=[], kw_defaults=[])
+    return [ast.FunctionDef(toks[1].id, args, toks[3], [], **_i(loc, s))] + toks[4:]
 
 def do_block(s, loc, toks):
     return [toks[:-1] + toks[-1]]
@@ -191,7 +197,40 @@ if __name__ == '__main__':
         end.
     """
 
-    a = program.parseString(t1)[0]
+    t2 = """
+        program main;
+        const i = 8;
+        begin
+            write(-i+4)
+        end.
+    """
+
+    t3 = """
+        program main;
+
+        procedure f1(a, b);
+        begin
+            write(a + b)
+        end;
+
+        procedure f2(n);
+        var i;
+        begin
+            i := 0;
+            while i < n do
+            begin
+                write(i+100);
+                i := i + 1
+            end
+        end
+
+        begin
+            call f1(1, 2);
+            call f2(8)
+        end.
+    """
+
+    a = program.parseString(t3)[0]
 
     from astpp import dump
     import pdb
