@@ -52,6 +52,9 @@ import ast
 def _i(loc, s):
     return {'lineno': lineno(loc, s), 'col_offset': col(loc, s)}
 
+def _list(t):
+    return t if isinstance(t, list) else [t]
+
 def do_ident(s, loc, toks):
     ident = ast.Name(**_i(loc, s))
     ident.id = toks[0]
@@ -115,17 +118,14 @@ def do_condition(s, loc, toks):
         return ast.Compare(toks[0], [toks[1]], [toks[2]], **_i(loc, s))
 
 def do_statement(s, loc, toks):
-    def _wrap(t):
-        return t if isinstance(t, list) else [t]
-
     if isinstance(toks[0], ast.Name):
         toks[0].ctx = ast.Store()
         return [ast.Assign([toks[0],], toks[1], **_i(loc, s))]
     elif toks[0] == 'if':
-        return [ast.If(toks[1], _wrap(toks[3]), \
-                _wrap(toks[5]) if len(toks) == 6 else [], **_i(loc, s))]
+        return [ast.If(toks[1], _list(toks[3]), \
+                _list(toks[5]) if len(toks) == 6 else [], **_i(loc, s))]
     elif toks[0] == 'while':
-        return [ast.While(toks[1], _wrap(toks[3]), [], **_i(loc, s))]
+        return [ast.While(toks[1], _list(toks[3]), [], **_i(loc, s))]
     elif toks[0] == 'call':
         toks[1].ctx = ast.Load()
         return [ast.Call(toks[1], toks[2:], [], [], [], **_i(loc, s))]
