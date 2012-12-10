@@ -196,5 +196,4 @@ if __name__ == '__main__':
     #pdb.set_trace()
     print dump(a)
     #print ast.dump(a, True, True)
-    import __builtin__
-    exec(__builtin__.compile(a, "<ast>", "exec"))
+    exec(__builtins__.compile(a, "<ast>", "exec"))
