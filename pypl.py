@@ -44,7 +44,7 @@ procedure  << Keyword('procedure') + ident + Group(Suppress('(') + ident + \
                   ZeroOrMore(Suppress(',') + ident) + Suppress(')')) + \
                   Suppress(';') + block + ZeroOrMore(Suppress(';') + procedure)
 program    = Keyword('program') + ident + Suppress(';') + block + Suppress('.')
-comment    = '{' + SkipTo('}')
+comment    = Regex(r"\{[^}]*?\}")
 program.ignore(comment)
 
 import ast
@@ -166,6 +166,7 @@ def compile(source, filename, mode):
 
 if __name__ == '__main__':
     t1 = """
+        {comment1}
         program main;
         var i, j, max, num;
         begin
@@ -175,6 +176,7 @@ if __name__ == '__main__':
             begin
                 j := 2;
                 while j < i do
+                    {comment2}
                     if ( i-i/j*j ) = 0 then
                         j := i+1
                     else
