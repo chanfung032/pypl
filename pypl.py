@@ -166,9 +166,18 @@ for k in locals().keys():
         expr.setParseAction(action)
         #expr.setDebug()
     
-def compile(source, filename, mode):
+def compile(source, fname):
     """Compile PL/0 source into PyCodeObject"""
-    print source
+    try:
+        a = program.parseString(source)[0]
+    except ParseException, e:
+        # see Objects/exceptions.c:SyntaxError_init
+        raise SyntaxError(e.msg, (fname,
+                                  lineno(e.loc, e.pstr),
+                                  col(e.loc, e.pstr),
+                                  line(e.loc, e.pstr)))
+
+    return __builtins__.compile(a, fname, 'exec')
 
 if __name__ == '__main__':
     t1 = """
@@ -230,11 +239,12 @@ if __name__ == '__main__':
         end.
     """
 
-    a = program.parseString(t3)[0]
+    exec(compile(t3, '<none>'))
 
     from astpp import dump
     import pdb
+    #a = program.parseString(t3)[0]
     #pdb.set_trace()
-    print dump(a)
+    #print dump(a)
     #print ast.dump(a, True, True)
-    exec(__builtins__.compile(a, "<ast>", "exec"))
+    #exec(__builtins__.compile(a, "<ast>", "exec"))
