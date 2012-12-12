@@ -5,46 +5,55 @@
 
 from pyparsing import *
 
-ident      = Word(alphas, alphanums)
-integer    = Word(nums, nums)
-aop        = Literal('+') ^ Literal('-')
-mop        = Literal('*') ^ Literal('/') 
-lop        = Literal('=') ^ Literal('<>') ^ Literal('<') ^ Literal('<=') ^ \
-             Literal('>') ^ Literal('>=')
-uop        = Literal('+') ^ Literal('-')
-expression = Forward()
-factor     = ident ^ integer ^ Suppress('(') + expression + Suppress(')')
-term       = factor + ZeroOrMore(mop + factor)
-expression << Optional(uop) + term + ZeroOrMore(aop + term)
-condition  = expression + lop + expression ^ Keyword('odd') + expression
-body       = Forward()
-statement  = Forward()
-statement  <<(ident + Suppress(':=') + expression ^ \
-              Keyword('if') + condition + Keyword('then') + statement + \
-                  Optional(Keyword('else') + statement) ^ \
-              Keyword('while') + condition + Keyword('do') + statement ^ \
-              Keyword('call') + ident + Optional(Suppress('(') + expression + \
-                  ZeroOrMore(Suppress(',') + expression) + Suppress(')')) ^ \
-              body | \
-              Keyword('read') + Suppress('(') + ident + 
-                  ZeroOrMore(Suppress(',') + ident) + Suppress(')') ^ \
-              Keyword('write') + Suppress('(') + expression + \
-                  ZeroOrMore(Suppress(',') + expression) + Suppress(')'))
-body       << Keyword('begin') + statement +  \
-                  ZeroOrMore(Suppress(';') + statement) + Keyword('end')
-procedure  = Forward()
-vardecl    = Keyword('var') + ident + ZeroOrMore(Suppress(',') + ident) + \
-                  Suppress(';')
-const      = ident + Suppress('=') + integer
-constdecl  = Keyword('const') + const + ZeroOrMore(Suppress(',') + const) + \
-             Suppress(';')
-block      = Optional(constdecl) + Optional(vardecl) + Optional(procedure) + \
-             body
-procedure  << Keyword('procedure') + ident + Group(Suppress('(') + ident + \
-                  ZeroOrMore(Suppress(',') + ident) + Suppress(')')) + \
-                  Suppress(';') + block + ZeroOrMore(Suppress(';') + procedure)
-program    = Keyword('program') + ident + Suppress(';') + block + Suppress('.')
-comment    = Regex(r"\{[^}]*?\}")
+LPAR, RPAR, SEMI, COMMA, PERIOD = map(Suppress, '();,.')
+
+keyword = ('program', 'procedure', 'var', 'const', 'begin', 'end',
+           'while', 'do', 'if', 'then', 'else', 'odd', 'call', 'read', 'write')
+__dict__ = locals()
+for k in keyword:
+    __dict__[k.upper()] = Keyword(k)
+
+ident     = Word(alphas, alphanums)
+integer   = Word(nums, nums)
+
+aop       = Literal('+') ^ Literal('-')
+mop       = Literal('*') ^ Literal('/')
+lop       = Literal('=') ^ Literal('<>') ^ Literal('<') ^ Literal('<=') ^ \
+            Literal('>') ^ Literal('>=')
+uop       = Literal('+') ^ Literal('-')
+
+expr      = Forward()
+factor    = ident ^ integer ^ LPAR + expr + RPAR
+term      = factor + ZeroOrMore(mop + factor)
+expr      << Optional(uop) + term + ZeroOrMore(aop + term)
+cond      = expr + lop + expr ^ ODD + expr
+
+body      = Forward()
+stmt      = Forward()
+stmt      <<(ident + Suppress(':=') + expr ^ \
+             IF + cond + THEN + stmt + Optional(ELSE + stmt) ^ \
+             WHILE + cond + DO + stmt ^ \
+             CALL + ident + Optional(LPAR + expr + \
+                 ZeroOrMore(COMMA + expr) + RPAR) ^ \
+             body ^ \
+             READ + LPAR + ident + ZeroOrMore(COMMA + ident) + RPAR ^ \
+             WRITE + LPAR + expr + ZeroOrMore(COMMA + expr) + RPAR)
+
+vardecl   = VAR + ident + ZeroOrMore(COMMA + ident) + SEMI
+const     = ident + Suppress('=') + integer
+constdecl = CONST + const + ZeroOrMore(COMMA + const) + \
+            SEMI
+
+proc      = Forward()
+body      << BEGIN + stmt + ZeroOrMore(SEMI + stmt) + END
+block     = Optional(constdecl) + Optional(vardecl) + Optional(proc) + body
+proc      << PROCEDURE + ident + Group(LPAR + ident + \
+                 ZeroOrMore(COMMA + ident) + RPAR) + \
+             SEMI + block + ZeroOrMore(SEMI + proc)
+
+program   = PROGRAM + ident + SEMI + block + PERIOD
+
+comment   = Regex(r"\{[^}]*?\}")
 program.ignore(comment)
 
 import ast
@@ -99,7 +108,7 @@ def do_term(s, loc, toks):
         left = ast.BinOp(left, toks[i], toks[i+1], **_i(loc, s))
     return [left]
 
-def do_expression(s, loc, toks):
+def do_expr(s, loc, toks):
     if isinstance(toks[0], ast.USub) or isinstance(toks[0], ast.UAdd):
         left = ast.UnaryOp(toks[0], toks[1], **_i(loc, s))
         start = 2
@@ -110,7 +119,7 @@ def do_expression(s, loc, toks):
         left = ast.BinOp(left, toks[i], toks[i+1], **_i(loc, s))
     return [left]
 
-def do_condition(s, loc, toks):
+def do_cond(s, loc, toks):
     if len(toks) == 2:
         # odd integer: integer % 2 != 0
         return ast.Compare(ast.BinOp(toks[1], ast.Mod(), ast.Num(2)), 
@@ -118,7 +127,7 @@ def do_condition(s, loc, toks):
     else:
         return ast.Compare(toks[0], [toks[1]], [toks[2]], **_i(loc, s))
 
-def do_statement(s, loc, toks):
+def do_stmt(s, loc, toks):
     if isinstance(toks[0], ast.Name):
         toks[0].ctx = ast.Store()
         return [ast.Assign([toks[0],], toks[1], **_i(loc, s))]
@@ -144,7 +153,7 @@ def do_vardecl(s, loc, toks):
 def do_body(s, loc, toks):
     return [toks[1:-1],]   # ignore keyword `begin` and `end`
 
-def do_procedure(s, loc, toks):
+def do_proc(s, loc, toks):
     for t in toks[2]:
         t.ctx = ast.Param()
     args = ast.arguments(args=list(toks[2]), vararg=None, kwarg=None,
@@ -160,10 +169,10 @@ def do_program(s, loc, toks):
 for k in locals().keys():
     if k.startswith('do_'):
         name = k[3:]
-        expr = vars()[name]
+        element = vars()[name]
         action = vars()[k]
-        expr.setName(name)
-        expr.setParseAction(action)
+        element.setName(name)
+        element.setParseAction(action)
         #expr.setDebug()
     
 def compile(source, fname):
