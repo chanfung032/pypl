@@ -33,22 +33,20 @@ stmt      = Forward()
 stmt      <<(ident + Suppress(':=') + expr ^ \
              IF + cond + THEN + stmt + Optional(ELSE + stmt) ^ \
              WHILE + cond + DO + stmt ^ \
-             CALL + ident + Optional(LPAR + expr + \
-                 ZeroOrMore(COMMA + expr) + RPAR) ^ \
+             CALL + ident + LPAR + Optional(delimitedList(expr)) + RPAR ^ \
              body ^ \
              READ + LPAR + ident + ZeroOrMore(COMMA + ident) + RPAR ^ \
              WRITE + LPAR + expr + ZeroOrMore(COMMA + expr) + RPAR)
+body      << BEGIN + stmt + ZeroOrMore(SEMI + stmt) + END
 
 vardecl   = VAR + ident + ZeroOrMore(COMMA + ident) + SEMI
 const     = ident + Suppress('=') + integer
-constdecl = CONST + const + ZeroOrMore(COMMA + const) + \
-            SEMI
+constdecl = CONST + const + ZeroOrMore(COMMA + const) + SEMI
 
 proc      = Forward()
-body      << BEGIN + stmt + ZeroOrMore(SEMI + stmt) + END
 block     = Optional(constdecl) + Optional(vardecl) + Optional(proc) + body
-proc      << PROCEDURE + ident + Group(LPAR + ident + \
-                 ZeroOrMore(COMMA + ident) + RPAR) + \
+
+proc      << PROCEDURE + ident + LPAR + Group(Optional(delimitedList(ident))) + RPAR + \
              SEMI + block + ZeroOrMore(SEMI + proc)
 
 program   = PROGRAM + ident + SEMI + block + PERIOD
@@ -166,13 +164,21 @@ def do_block(s, loc, toks):
 def do_program(s, loc, toks):
     return ast.Module(body=toks[2], **_i(loc, s))
 
+def _dis(name, s, loc, toks):
+    print '>', name, toks
+    rc = globals()[name](s, loc, toks)
+    print '<', name, rc
+    return rc
+
 for k in locals().keys():
     if k.startswith('do_'):
         name = k[3:]
         element = vars()[name]
         action = vars()[k]
         element.setName(name)
-        element.setParseAction(action)
+        import functools
+        element.setParseAction(functools.partial(_dis, k))
+        #element.setParseAction(action)
         #expr.setDebug()
     
 def compile(source, fname):
@@ -189,9 +195,11 @@ def compile(source, fname):
     return __builtins__.compile(a, fname, 'exec')
 
 if __name__ == '__main__':
-    t1 = """
+    tests = """
         {comment1}
         program main;
+
+        procedure test1();
         var i, j, max, num;
         begin
             i := 0; max := 1000;
@@ -212,43 +220,29 @@ if __name__ == '__main__':
                 end;
                 i := i+1
             end
-        end.
-    """
+        end;
 
-    t2 = """
-        program main;
+        procedure test2();
         const i = 8;
         begin
             write(-i+4)
-        end.
-    """
-
-    t3 = """
-        program main;
-
-        procedure f1(a, b);
-        begin
-            write(a + b)
         end;
 
-        procedure f2(n);
-        var i;
-        begin
-            i := 0;
-            while i < n do
-            begin
-                write(i+100);
-                i := i + 1
-            end
-        end
+        procedure test3(a);
+        begin write(a) end;
+
+        procedure test4(a, b);
+        begin write(a + b) end
 
         begin
-            call f1(1, 2);
-            call f2(8)
+            call test1();
+            call test2();
+            call test3(8);
+            call test4(1, 2)
         end.
     """
 
-    exec(compile(t3, '<none>'))
+    exec(compile(tests, '<none>'))
 
     from astpp import dump
     import pdb
