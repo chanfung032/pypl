@@ -35,7 +35,6 @@ stmt      <<(ident + Suppress(':=') + expr ^ \
              WHILE + cond + DO + stmt ^ \
              CALL + ident + LPAR + Optional(delimitedList(expr)) + RPAR ^ \
              body ^ \
-             READ + LPAR + delimitedList(ident) + RPAR ^ \
              WRITE + LPAR + delimitedList(expr) + RPAR)
 body      << BEGIN + stmt + ZeroOrMore(SEMI + stmt) + END
 
