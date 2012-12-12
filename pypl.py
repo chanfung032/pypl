@@ -30,10 +30,10 @@ cond      = expr + lop + expr ^ ODD + expr
 
 body      = Forward()
 stmt      = Forward()
-stmt      <<(ident + Suppress(':=') + expr ^ \
+stmt      <<(ident + ':=' + expr ^ \
              IF + cond + THEN + stmt + Optional(ELSE + stmt) ^ \
              WHILE + cond + DO + stmt ^ \
-             CALL + ident + LPAR + Optional(delimitedList(expr)) + RPAR ^ \
+             ident + LPAR + Optional(delimitedList(expr)) + RPAR ^ \
              body ^ \
              WRITE + LPAR + delimitedList(expr) + RPAR)
 body      << BEGIN + stmt + ZeroOrMore(SEMI + stmt) + END
@@ -125,22 +125,21 @@ def do_cond(s, loc, toks):
         return ast.Compare(toks[0], [toks[1]], [toks[2]], **_i(loc, s))
 
 def do_stmt(s, loc, toks):
-    if isinstance(toks[0], ast.Name):
+    if len(toks) == 3 and toks[1] == ':=':
         toks[0].ctx = ast.Store()
-        return [ast.Assign([toks[0],], toks[1], **_i(loc, s))]
+        return [ast.Assign([toks[0],], toks[2], **_i(loc, s))]
     elif toks[0] == 'if':
         return [ast.If(toks[1], _list(toks[3]), \
                 _list(toks[5]) if len(toks) == 6 else [], **_i(loc, s))]
     elif toks[0] == 'while':
         return [ast.While(toks[1], _list(toks[3]), [], **_i(loc, s))]
-    elif toks[0] == 'call':
-        toks[1].ctx = ast.Load()
-        call = ast.Call(toks[1], toks[2:], [], None, None, **_i(loc, s))
+    elif isinstance(toks[0], ast.Name):
+        # use primitive `print`
+        if toks[0].id == 'write':
+            return [ast.Print(None, toks[1:], True, **_i(loc, s))]
+        toks[0].ctx = ast.Load()
+        call = ast.Call(toks[0], toks[1:], [], None, None, **_i(loc, s))
         return [ast.Expr(call, **_i(loc, s))]
-    elif toks[0] == 'read':
-        pass
-    elif toks[0] == 'write':
-        return [ast.Print(None, toks[1:], True, **_i(loc, s))]
     else:
         return toks
 
@@ -234,11 +233,19 @@ if __name__ == '__main__':
         begin write(a + b) end
 
         begin
-            call test1();
-            call test2();
-            call test3(8);
-            call test4(1, 2)
+            test1();
+            test2();
+            test3(8);
+            test4(1, 2)
         end.
+    """
+
+    tests1 = """
+    program main;
+    procedure add(a, b);
+    begin write(a + b) end
+
+    begin add(1, 2) end.
     """
 
     exec(compile(tests, '<none>'))
