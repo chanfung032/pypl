@@ -15,6 +15,7 @@ for k in keyword:
 
 ident     = Word(alphas+'_', alphanums+'_')
 integer   = Word(nums, nums)
+string_   = quotedString
 
 aop       = Literal('+') ^ Literal('-')
 mop       = Literal('*') ^ Literal('/')
@@ -23,7 +24,7 @@ lop       = Literal('=') ^ Literal('<>') ^ Literal('<') ^ Literal('<=') ^ \
 uop       = Literal('+') ^ Literal('-')
 
 expr      = Forward()
-factor    = ident ^ integer ^ LPAR + expr + RPAR
+factor    = ident ^ integer ^ string_ ^ LPAR + expr + RPAR
 term      = factor + ZeroOrMore(mop + factor)
 expr      << Optional(uop) + term + ZeroOrMore(aop + term)
 cond      = expr + lop + expr ^ ODD + expr
@@ -39,7 +40,7 @@ stmt      <<(ident + ':=' + expr ^ \
 body      << BEGIN + stmt + ZeroOrMore(SEMI + stmt) + END
 
 vardecl   = VAR + ident + ZeroOrMore(COMMA + ident) + SEMI
-const     = ident + Suppress('=') + integer
+const     = ident + Suppress('=') + (integer ^ string_)
 constdecl = CONST + const + ZeroOrMore(COMMA + const) + SEMI
 
 proc      = Forward()
@@ -70,6 +71,9 @@ def do_ident(s, loc, toks):
 
 def do_integer(s, loc, toks):
     return [ast.Num(int(toks[0]), **_i(loc, s))]
+
+def do_string_(s, loc, toks):
+    return [ast.Str(toks[0], **_i(loc, s))]
 
 def do_aop(s, loc, toks):
     return [ast.Add(**_i(loc, s)) if toks[0] == '+' else ast.Sub(**_i(loc, s))]
@@ -223,9 +227,9 @@ end.
 
 """
 program main;
-const _i=1, i_=2, _=3, __=4;
+const _i=1, i_=2, _=3, __=4, s='hello';
 begin
-    write(_i, i_, _, __)
+    write(_i, i_, _, __, s)
 end.
 """,
 
