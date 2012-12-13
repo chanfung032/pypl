@@ -13,7 +13,7 @@ __dict__ = locals()
 for k in keyword:
     __dict__[k.upper()] = Keyword(k)
 
-ident     = Word(alphas, alphanums)
+ident     = Word(alphas+'_', alphanums+'_')
 integer   = Word(nums, nums)
 
 aop       = Literal('+') ^ Literal('-')
@@ -221,6 +221,14 @@ end.
 """,
 
 """
+program main;
+const _i=1, i_=2, _=3, __=4;
+begin
+    write(_i, i_, _, __)
+end.
+""",
+
+"""
 { closure }
 program main;
 procedure rec(n);
@@ -241,7 +249,8 @@ begin rec(10) end.
         print 'INPUT:'
         print t
         print 'OUTPUT:'
-        exec(compile(t, '<none>'))
+        dct = {}
+        exec(compile(t, '<none>'), dct)
 
     from astpp import dump
     import pdb
