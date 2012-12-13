@@ -190,10 +190,7 @@ def compile(source, fname):
         a = program.parseString(source)[0]
     except ParseException, e:
         # see Objects/exceptions.c:SyntaxError_init
-        raise SyntaxError(e.msg, (fname,
-                                  lineno(e.loc, e.pstr),
-                                  col(e.loc, e.pstr),
-                                  line(e.loc, e.pstr)))
+        raise SyntaxError(e.msg, (fname, e.lineno, e.col, e.line))
 
     return __builtins__.compile(a, fname, 'exec')
 
