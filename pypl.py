@@ -193,62 +193,55 @@ def compile(source, fname):
     return __builtins__.compile(a, fname, 'exec')
 
 if __name__ == '__main__':
-    tests = """
-        {comment1}
-        program main;
-
-        procedure test1();
-        var i, j, max, num;
+    tests = [
+"""
+{comment1}
+program main;
+var i, j, max, num;
+begin
+    i := 0; max := 1000;
+    num := 0;
+    while i <= max do
+    begin
+        j := 2;
+        while j < i do
+            {comment2}
+            if ( i-i/j*j ) = 0 then
+                j := i+1
+            else
+                j := j+1;
+        if j = i then
         begin
-            i := 0; max := 1000;
-            num := 0;
-            while i <= max do
-            begin
-                j := 2;
-                while j < i do
-                    {comment2}
-                    if ( i-i/j*j ) = 0 then
-                        j := i+1
-                    else
-                        j := j+1;
-                if j = i then
-                begin
-                    write( i );
-                    num := num +1
-                end;
-                i := i+1
-            end
+            write( i );
+            num := num +1
         end;
+        i := i+1
+    end
+end.
+""",
 
-        procedure test2();
-        const i = 8;
+"""
+{ closure }
+program main;
+procedure rec(n);
+    procedure w(n);
+    begin
+        if n <> 0 then
         begin
-            write(-i+4)
-        end;
+            w(n - 1);
+            write(n)
+        end
+    end
+begin w(n) end
 
-        procedure test3(a);
-        begin write(a) end;
+begin rec(10) end.
+"""]
 
-        procedure test4(a, b);
-        begin write(a + b) end
-
-        begin
-            test1();
-            test2();
-            test3(8);
-            test4(1, 2)
-        end.
-    """
-
-    tests1 = """
-    program main;
-    procedure add(a, b);
-    begin write(a + b) end
-
-    begin add(1, 2) end.
-    """
-
-    exec(compile(tests, '<none>'))
+    for t in tests:
+        print 'INPUT:'
+        print t
+        print 'OUTPUT:'
+        exec(compile(t, '<none>'))
 
     from astpp import dump
     import pdb
