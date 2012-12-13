@@ -7,8 +7,8 @@ from pyparsing import *
 
 LPAR, RPAR, SEMI, COMMA, PERIOD = map(Suppress, '();,.')
 
-keyword = ('program', 'procedure', 'var', 'const', 'begin', 'end',
-           'while', 'do', 'if', 'then', 'else', 'odd', 'call', 'read', 'write')
+keyword = ('program', 'function', 'var', 'const', 'begin', 'end', 'return',
+           'while', 'do', 'if', 'then', 'else', 'odd', 'read', 'write')
 __dict__ = locals()
 for k in keyword:
     __dict__[k.upper()] = Keyword(k)
@@ -24,7 +24,8 @@ lop       = Literal('=') ^ Literal('<>') ^ Literal('<') ^ Literal('<=') ^ \
 uop       = Literal('+') ^ Literal('-')
 
 expr      = Forward()
-factor    = ident ^ integer ^ string_ ^ LPAR + expr + RPAR
+call      = ident + LPAR + Optional(delimitedList(expr)) + RPAR
+factor    = call | (ident ^ integer ^ string_ ^ LPAR + expr + RPAR)
 term      = factor + ZeroOrMore(mop + factor)
 expr      << Optional(uop) + term + ZeroOrMore(aop + term)
 cond      = expr + lop + expr ^ ODD + expr
@@ -34,21 +35,21 @@ stmt      = Forward()
 stmt      <<(ident + ':=' + expr ^ \
              IF + cond + THEN + stmt + Optional(ELSE + stmt) ^ \
              WHILE + cond + DO + stmt ^ \
-             ident + LPAR + Optional(delimitedList(expr)) + RPAR ^ \
+             RETURN + expr ^ \
              body ^ \
-             WRITE + LPAR + delimitedList(expr) + RPAR)
+             (WRITE + LPAR + delimitedList(expr) + RPAR | expr))
 body      << BEGIN + stmt + ZeroOrMore(SEMI + stmt) + END
 
 vardecl   = VAR + ident + ZeroOrMore(COMMA + ident) + SEMI
 const     = ident + Suppress('=') + (integer ^ string_)
 constdecl = CONST + const + ZeroOrMore(COMMA + const) + SEMI
 
-proc      = Forward()
-block     = Optional(constdecl) + Optional(vardecl) + Optional(proc) + body
+func      = Forward()
+block     = Optional(constdecl) + Optional(vardecl) + Optional(func) + body
 
-proc      << PROCEDURE + ident + \
+func      << FUNCTION + ident + \
              LPAR + Group(Optional(delimitedList(ident))) + RPAR + \
-             SEMI + block + ZeroOrMore(SEMI + proc)
+             SEMI + block + ZeroOrMore(SEMI + func)
 
 program   = PROGRAM + ident + SEMI + block + PERIOD
 
@@ -98,6 +99,10 @@ def do_const(s, loc, toks):
 def do_constdecl(s, loc, toks):
     return toks[1:] # ignore the leading 'const' keyword
 
+def do_call(s, loc, toks):
+    toks[0].ctx = ast.Load()
+    return [ast.Call(toks[0], toks[1:], [], None, None, **_i(loc, s))]
+
 def do_factor(s, loc, toks):
     for t in toks:
         if isinstance(t, ast.Name):
@@ -138,13 +143,12 @@ def do_stmt(s, loc, toks):
                 _list(toks[5]) if len(toks) == 6 else [], **_i(loc, s))]
     elif toks[0] == 'while':
         return [ast.While(toks[1], _list(toks[3]), [], **_i(loc, s))]
-    elif isinstance(toks[0], ast.Name):
-        # use primitive `print`
-        if toks[0].id == 'write':
-            return [ast.Print(None, toks[1:], True, **_i(loc, s))]
-        toks[0].ctx = ast.Load()
-        call = ast.Call(toks[0], toks[1:], [], None, None, **_i(loc, s))
-        return [ast.Expr(call, **_i(loc, s))]
+    elif toks[0] == 'write':
+        return [ast.Print(None, toks[1:], True, **_i(loc, s))]
+    elif toks[0] == 'return':
+        return [ast.Return(toks[1], **_i(loc, s))]
+    elif isinstance(toks[0], ast.Call):
+        return [ast.Expr(toks[0], **_i(loc, s))]
     else:
         return toks
 
@@ -154,7 +158,7 @@ def do_vardecl(s, loc, toks):
 def do_body(s, loc, toks):
     return [toks[1:-1],]   # ignore keyword `begin` and `end`
 
-def do_proc(s, loc, toks):
+def do_func(s, loc, toks):
     for t in toks[2]:
         t.ctx = ast.Param()
     args = ast.arguments(args=list(toks[2]), vararg=None, kwarg=None,
@@ -179,9 +183,9 @@ for k in locals().keys():
         element = vars()[name]
         action = vars()[k]
         element.setName(name)
-        import functools
-        element.setParseAction(functools.partial(_dis, k))
-        #element.setParseAction(action)
+        #import functools
+        #element.setParseAction(functools.partial(_dis, k))
+        element.setParseAction(action)
         #expr.setDebug()
     
 def compile(source, fname):
@@ -201,7 +205,7 @@ if __name__ == '__main__':
 program main;
 var i, j, max, num;
 begin
-    i := 0; max := 1000;
+    i := 0; max := 100;
     num := 0;
     while i <= max do
     begin
@@ -231,10 +235,30 @@ end.
 """,
 
 """
+program main;
+function add(a, b);
+begin
+    return a + b
+end;
+
+function procedure();
+begin
+    write('this is a procedure')
+end
+
+begin
+    write('1 + 1 =', add(1, 2));
+    { call python builtin }
+    write('min(max(1, 2), 0) =', min(max(1, 2), 0));
+    procedure()
+end.
+""",
+
+"""
 { closure }
 program main;
-procedure rec(n);
-    procedure w(n);
+function rec(n);
+    function w(n);
     begin
         if n <> 0 then
         begin
@@ -242,7 +266,7 @@ procedure rec(n);
             write(n)
         end
     end
-begin w(n) end
+begin write(w(n)) end
 
 begin rec(10) end.
 """]
