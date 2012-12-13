@@ -45,7 +45,8 @@ constdecl = CONST + const + ZeroOrMore(COMMA + const) + SEMI
 proc      = Forward()
 block     = Optional(constdecl) + Optional(vardecl) + Optional(proc) + body
 
-proc      << PROCEDURE + ident + LPAR + Group(Optional(delimitedList(ident))) + RPAR + \
+proc      << PROCEDURE + ident + \
+             LPAR + Group(Optional(delimitedList(ident))) + RPAR + \
              SEMI + block + ZeroOrMore(SEMI + proc)
 
 program   = PROGRAM + ident + SEMI + block + PERIOD
