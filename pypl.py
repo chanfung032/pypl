@@ -73,7 +73,7 @@ def do_integer(s, loc, toks):
     return [ast.Num(int(toks[0]), **_i(loc, s))]
 
 def do_string_(s, loc, toks):
-    return [ast.Str(toks[0], **_i(loc, s))]
+    return [ast.Str(toks[0][1:-1], **_i(loc, s))]
 
 def do_aop(s, loc, toks):
     return [ast.Add(**_i(loc, s)) if toks[0] == '+' else ast.Sub(**_i(loc, s))]
@@ -226,7 +226,7 @@ end.
 program main;
 const _i=1, i_=2, _=3, __=4, s='hello';
 begin
-    write(_i, i_, _, __, s)
+    write(_i, i_, _, __, s + ", world!")
 end.
 """,
 
