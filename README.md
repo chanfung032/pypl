@@ -48,3 +48,4 @@ refs:
 + [Language Implementation Patterns](http://book.douban.com/subject/4030327/)
 + http://onlamp.com/pub/a/python/2006/01/26/pyparsing.html
 + http://effbot.org/zone/simple-top-down-parsing.htm
+  django used this algorithm in the parsing process of `if` block, see: django/template/smartif.py
